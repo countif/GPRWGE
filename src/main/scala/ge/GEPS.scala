@@ -46,14 +46,22 @@ class GEPS(params: Map[String, String]) extends GraphEmbedding(params: Map[Strin
 
 			// get dstModel indices to pull
 			val indicesSet: IntOpenHashSet = new IntOpenHashSet()
+
 			for(i <- 0 until(negArray.length)){
 				indicesSet.add(negArray(i))
 			}
 			for(i <- 0 until(dstIds.length)){
 				indicesSet.add(dstIds(i))
 			}
+
+
 			logInfo(s"*ghand*dstIds.length:${dstIds.length}")
 			val indices: Array[Int] = indicesSet.toIntArray()
+
+			for(i<- 0 until indices.length)
+				println("indices\t"+indices(i))
+
+			println("indices length\t"+indices.length)
 
 			startTime = System.currentTimeMillis()
 			// pull them and train

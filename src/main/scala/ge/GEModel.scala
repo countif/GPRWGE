@@ -170,3 +170,103 @@ class GERDDModel (sampler: BaseSampler, bcMeta: Broadcast[DistributionMeta],
 		srcDstModel.unpersist()
 	}
 }
+
+class GEWORKERModel (sampler: BaseSampler, bcMeta: Broadcast[DistributionMeta],
+                 dimension: Int, numNodePerRow: Int, numParts: Int) extends GEModel(sampler, bcMeta, dimension){
+  val srcModel: PSMatrix = {
+    val trainSet = sampler.trainset
+    val context: PSContext = PSContext.getOrCreate(trainSet.context)
+    val numNode = bcMeta.value.srcMeta.length
+    val numRow = numNode / numNodePerRow + 1
+    val numCol = numNodePerRow * dimension
+    val rowsInBlock = numRow / numParts + 1
+    val colsInBlock = numCol
+    val srcModel = PSMatrix.dense(numRow, numCol, rowsInBlock, colsInBlock, RowType.T_FLOAT_DENSE,
+      Map(AngelConf.ANGEL_PS_PARTITION_SOURCE_CLASS -> classOf[PartitionSourceMap].getName))
+    srcModel.psfUpdate(new GERandom(new GERandomParam(srcModel.id, dimension))).get()
+    println("srcModel.id"+srcModel.id)
+    srcModel
+  }
+
+
+  val dstModel: PSMatrix = {
+    val trainSet = sampler.trainset
+    val context: PSContext = PSContext.getOrCreate(trainSet.context)
+    val numNode = bcMeta.value.srcMeta.length
+    val numRow = numNode / numNodePerRow + 1
+    val numCol = numNodePerRow * dimension
+    val rowsInBlock = numRow / numParts + 1
+    val colsInBlock = numCol
+    val dstModel = PSMatrix.dense(numRow, numCol, rowsInBlock, colsInBlock, RowType.T_FLOAT_DENSE,
+      Map(AngelConf.ANGEL_PS_PARTITION_SOURCE_CLASS -> classOf[PartitionSourceMap].getName))
+    dstModel.psfUpdate(new GERandom(new GERandomParam(dstModel.id, dimension))).get()
+    println("dstModel.id"+dstModel.id)
+    dstModel
+  }
+
+
+  override def saveSrcModel(path: String, bcDict: Broadcast[Array[String]]): Unit = {
+    // to be finished
+  }
+
+  override def saveDstModel(path: String, bcDict: Broadcast[Array[String]]): Unit = {
+    // to be finished
+  }
+
+  override def destory(): Unit ={
+    srcModel.destroy()
+    dstModel.destroy()
+    PSContext.stop()
+  }
+
+}
+
+
+
+class GEDOTModel (sampler: BaseSampler, bcMeta: Broadcast[DistributionMeta],
+                     dimension: Int, numNodePerRow: Int, numParts: Int) extends GEModel(sampler, bcMeta, dimension){
+  val srcModel: PSMatrix = {
+    val trainSet = sampler.trainset
+    val context: PSContext = PSContext.getOrCreate(trainSet.context)
+    val numNode = bcMeta.value.srcMeta.length
+    val numRow = numNode / numNodePerRow + 1
+    val numCol = numNodePerRow * dimension
+    val rowsInBlock = numRow / numParts + 1
+    val colsInBlock = numCol
+    val srcModel = PSMatrix.dense(numRow, numCol, rowsInBlock, colsInBlock, RowType.T_FLOAT_DENSE,
+      Map(AngelConf.ANGEL_PS_PARTITION_SOURCE_CLASS -> classOf[PartitionSourceMap].getName))
+    srcModel.psfUpdate(new GERandom(new GERandomParam(srcModel.id, dimension))).get()
+    srcModel
+  }
+
+
+  val dstModel: PSMatrix = {
+    val trainSet = sampler.trainset
+    val context: PSContext = PSContext.getOrCreate(trainSet.context)
+    val numNode = bcMeta.value.srcMeta.length
+    val numRow = numNode / numNodePerRow + 1
+    val numCol = numNodePerRow * dimension
+    val rowsInBlock = numRow / numParts + 1
+    val colsInBlock = numCol
+    val dstModel = PSMatrix.dense(numRow, numCol, rowsInBlock, colsInBlock, RowType.T_FLOAT_DENSE,
+      Map(AngelConf.ANGEL_PS_PARTITION_SOURCE_CLASS -> classOf[PartitionSourceMap].getName))
+    dstModel.psfUpdate(new GERandom(new GERandomParam(dstModel.id, dimension))).get()
+    dstModel
+  }
+
+
+  override def saveSrcModel(path: String, bcDict: Broadcast[Array[String]]): Unit = {
+    // to be finished
+  }
+
+  override def saveDstModel(path: String, bcDict: Broadcast[Array[String]]): Unit = {
+    // to be finished
+  }
+
+  override def destory(): Unit ={
+    srcModel.destroy()
+    dstModel.destroy()
+    PSContext.stop()
+  }
+
+}
