@@ -126,9 +126,9 @@ abstract class GraphEmbedding(val params: Map[String, String]) extends Serializa
 			while (batchId < numChunks) {
 				val batchData: RDD[PairsDataset] = batchIter.next() // barrierRDD
 				val shuffledData = shuffleDataBySource(batchData, bcMeta)
-//				shuffledData.cache()
+				//shuffledData.cache()
 				val (batchLoss, batchCnt) = train(shuffledData, bcMeta, geModel, vertexNum, batchId)
-//				shuffledData.unpersist()
+				//shuffledData.unpersist()
 				trainedLoss += batchLoss
 				trainedPairs += batchCnt
 				batchId += 1

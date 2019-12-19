@@ -31,11 +31,21 @@ object Features extends Logging{
 
 		val splittedStrings: RDD[Array[String]] = data.filter(f => f != null && f.length > 0 && !f.startsWith("#"))
 			.map(f => f.stripLineEnd.split(DELIMITER))
+		print("look at splitedStrings\n")
+		val st = splittedStrings.collect().take(10)
+		print("hjello\n")
+		st.foreach(x=>{
+			print("in st\n")
+			x.foreach(y=>print(y+"\n"))
+		})
 
 		val dict: Array[String] = splittedStrings.flatMap(f => f)
     		.distinct().collect()
+		// distinct 得到所有的节点
 		val vertexNum = dict.length
 		val bcDict: Broadcast[Array[String]] = data.sparkContext.broadcast(dict)
+		print("Number of Vertex:\t"+dict.length+"\n")
+		print("first element of dict:\t"+dict(0)+"\n")
 
 		/**
 		  * one element in this RDD: [chunk_i, size]
@@ -53,6 +63,7 @@ object Features extends Logging{
 			}
 
 			// parse the dataset into chunked ints
+			// 划分batch size, initData实际上是将(src,dst)节点转换为 (src,dst)并且以bcdict为下标.
 			val chunkBuffer: ArrayBuffer[ChunkDataset] = new ArrayBuffer[ChunkDataset]()
 			var dataId = 0
 			var chunkId = 0
@@ -68,6 +79,19 @@ object Features extends Logging{
 
 			chunkBuffer.map(chunkDataSet => (chunkDataSet, chunkId + 1)).toIterator
 		})
+		intData.collect().take(10).foreach(x=>{
+			print("see the length\n")
+			print(x._1.chunkedArrays(0).length)
+			print("see the vertex\n")
+			x._1.chunkedArrays(0).foreach(
+				y=>{
+					print(y)
+					print(" ")
+				}
+			)
+			print("\n")
+		})
+
 		(intData, bcDict, vertexNum)
 	}
 
