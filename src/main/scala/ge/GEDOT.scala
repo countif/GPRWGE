@@ -2,6 +2,14 @@ package ge
 
 import java.util.Random
 
+import com.tencent.angel.ml.matrix.psf.get.base.{GetFunc, GetResult}
+import com.tencent.angel.ml.matrix.psf.update.base.{UpdateFunc, VoidResult}
+import com.tencent.angel.spark.ml.embedding.NEModel.NEDataSet
+import com.tencent.angel.spark.ml.embedding.word2vec.Word2VecModel.W2VDataSet
+import DotAdjust.AdjustParam
+import DotAdjust.Adjust
+import DotAdjust.Dot
+import DotAdjust.DotParam
 import com.tencent.angel.spark.models.PSMatrix
 import org.apache.spark.rdd.RDD
 import org.apache.spark.broadcast.Broadcast
@@ -12,134 +20,89 @@ import org.apache.spark.TaskContext
 import org.apache.spark.sql.SparkSession
 import samplers.{APP, BaseSampler, DeepWalk, LINE}
 import utils.FastMath
+import com.tencent.angel.spark.ml.psf.embedding.NEDot.NEDotResult
+
 class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[String, String]){
 
   val numParts = params.getOrElse(EmbeddingConf.NUMPARTS, "10").toInt
   val numNodePerRow = params.getOrElse(EmbeddingConf.NUMNODEPERROW, "10000").toInt
+  var psMatrix:PSMatrix =  _
 
   override def initModel(sampler: BaseSampler, bcMeta: Broadcast[DistributionMeta]): GEModel = {
     new GEDOTModel(sampler, bcMeta, dimension, numNodePerRow, numParts)
+  }
+
+
+  def getDotFunc(data: PairsDataset, batchSeed: Int, ns: Int, partitionId: Int): GetFunc = {
+    val pairData = data.asInstanceOf[PairsDataset]
+    val param = new DotParam(psMatrix.id, batchSeed, partitionId, pairData.src.toArray, pairData.dst.toArray)
+    new Dot(param)
+  }
+  protected def psfUpdate(func: UpdateFunc): VoidResult = {
+    psMatrix.psfUpdate(func).get()
+  }
+
+  protected def psfGet(func: GetFunc): GetResult = {
+    psMatrix.psfGet(func)
+  }
+
+  def getAdjustFunc(data: PairsDataset,
+                             batchSeed: Int,
+                             ns: Int,
+                             grad: Array[Float],
+                             partitionId: Int): UpdateFunc = {
+    val pairData = data.asInstanceOf[PairsDataset]
+    val param = new AdjustParam(psMatrix.id, batchSeed, ns, partitionId, grad, pairData.src.toArray, pairData.dst.toArray)
+    new Adjust(param)
+  }
+
+  def doGrad(dots: Array[Float], negative: Int, alpha: Float): Float = {
+    var loss = 0.0
+    for (i <- dots.indices) {
+      val prob = FastMath.sigmoid(dots(i))
+      if (i % (negative + 1) == 0) {
+        dots(i) = alpha * (1 - prob)
+        loss -= FastMath.log(prob)
+      } else {
+        dots(i) = -alpha * FastMath.sigmoid(dots(i))
+        loss -= FastMath.log(1 - prob)
+      }
+    }
+    loss.toFloat
   }
 
   override def train(batchData: RDD[(Int, PairsDataset)], bcMeta: Broadcast[DistributionMeta],
                      gEModel: GEModel, vertexNum: Int, iterationId: Int): (Float, Int) = {
     val numPartititions = batchData.getNumPartitions
     val gePSModel: GEDOTModel = gEModel.asInstanceOf[GEDOTModel]
-    val srcModel: PSMatrix = gePSModel.srcModel
-    val dstModel: PSMatrix = gePSModel.dstModel
 
-    val (batchLoss, batchCnt) = batchData.mapPartitions((iterator) => {
-      var (startTime, endTime) = (0L, 0L)
+    val psModel: PSMatrix = gePSModel.psModel
+    var seed = 5
+    val (batchLoss, batchCnt) = batchData.mapPartitionsWithIndex((partitionId,iterator) => {
+      //batch data
       val pairsDataset = iterator.next()._2
       val srcIds = pairsDataset.src.toArray
-      val dstIds = pairsDataset.dst.toArray
 
-      // get negative sampling nodes
-      val random: Random = new Random(iterationId)
-      val negArray: Array[Int] = Array.ofDim(negative)
-      for (i <- 0 until (negArray.length)) {
-        negArray(i) = random.nextInt(vertexNum)
-      }
+      var (start, end) = (0L, 0L)
+      // dot
+      start = System.currentTimeMillis()
+      val dots = psfGet(getDotFunc(pairsDataset, seed, negative, partitionId))
+        .asInstanceOf[NEDotResult].result
+      end = System.currentTimeMillis()
+      val dotTime = end - start
+      // gradient
+      start = System.currentTimeMillis()
+      val loss = doGrad(dots, negative, stepSize)
+      end = System.currentTimeMillis()
+      val gradientTime = end - start
+      // adjust
+      start = System.currentTimeMillis()
+      psfUpdate(getAdjustFunc(pairsDataset, seed, negative, dots, partitionId))
+      end = System.currentTimeMillis()
+      val adjustTime = end - start
+      //       return loss
 
-      // get srcModel indices to pull
-      val srcindicesSet: IntOpenHashSet = new IntOpenHashSet()
-
-      for(i <- 0 until(negArray.length)){
-        srcindicesSet.add(srcIds(i))
-      }
-
-
-      // get dstModel indices to pull
-      val indicesSet: IntOpenHashSet = new IntOpenHashSet()
-      for(i <- 0 until(negArray.length)){
-        indicesSet.add(negArray(i))
-      }
-      for(i <- 0 until(dstIds.length)){
-        indicesSet.add(dstIds(i))
-      }
-      logInfo(s"*ghand*dstIds.length:${dstIds.length}")
-      val dstindices: Array[Int] = indicesSet.toIntArray()
-      val srcindices: Array[Int] = indicesSet.toIntArray()
-
-      startTime = System.currentTimeMillis()
-      // pull them and train
-      val srcresult  = srcModel.psfGet(new GEPull(
-        new GEPullParam(srcModel.id,
-          srcindices,
-          numNodePerRow,
-          dimension)))
-        .asInstanceOf[GEPullResult]
-
-      val dstresult  = dstModel.psfGet(new GEPull(
-        new GEPullParam(dstModel.id,
-          dstindices,
-          numNodePerRow,
-          dimension)))
-        .asInstanceOf[GEPullResult]
-
-      endTime = System.currentTimeMillis()
-      logInfo(s"*ghand*worker ${TaskContext.getPartitionId()} pulls ${srcindices.length+dstindices.length} vectors " +
-        s"from PS, takes ${(endTime - startTime) / 1000.0} seconds.")
-
-      startTime = System.currentTimeMillis()
-      val dstindex2offset = new Int2IntOpenHashMap() //
-      dstindex2offset.defaultReturnValue(-1)
-      for (i <- 0 until dstindices.length) dstindex2offset.put(dstindices(i), i)
-
-      val srcindex2offset = new Int2IntOpenHashMap()
-      srcindex2offset.defaultReturnValue(-1)
-      for (i <- 0 until srcindices.length) srcindex2offset.put(srcindices(i),i)
-
-      val dstdeltas = new Array[Float](dstresult.layers.length)
-      // deep copy for deltas, we do asgd, for shared Negative sampling, it is not asgd
-      val srcdeltas = new Array[Float](srcresult.layers.length)
-      for(i <- 0 until(srcresult.layers.length)){
-        srcdeltas(i) = srcresult.layers(i)
-      }
-      for(i <- 0 until(dstresult.layers.length)){
-        dstdeltas(i) = dstresult.layers(i)
-      }
-      // deep copy for src vec
-
-      var loss = 0.0f
-      val sharedNegativeUpdate: Array[Float] = Array.ofDim(negative * dimension)
-      for(i <- 0 until(srcIds.length)){
-        val srcId = srcIds(i)
-        val dstId = dstIds(i)
-        loss += psTrainOnePair(srcdeltas,srcId, dstId, negArray, sharedNegativeUpdate,srcindex2offset, dstindex2offset, dstdeltas)
-      }
-
-      for(i <- 0 until(srcdeltas.length)){
-        srcdeltas(i) -= srcresult.layers(i)
-      }
-      for(i <- 0 until(dstdeltas.length)){
-        dstdeltas(i) -= dstresult.layers(i)
-      }
-
-
-      // update the shared negative sampling nodes
-      for(i <- 0 until(negArray.length)){
-        val ioffset = dstindex2offset.get(negArray(i)) * dimension
-        for(j <- 0 until(dimension)) {
-          dstdeltas(ioffset + j) += sharedNegativeUpdate(i * dimension + j)
-        }
-      }
-      endTime = System.currentTimeMillis()
-      // TODO: some penalty to frequently updates, i.e., stale updates
-      logInfo(s"*ghand*worker ${TaskContext.getPartitionId()} finished training, " +
-        s"takes ${(endTime - startTime) / 1000.0} seconds.")
-      startTime = System.currentTimeMillis()
-      dstModel.psfUpdate(new GEPush(
-        new GEPushParam(dstModel.id,
-          dstindices, dstdeltas, numNodePerRow, dimension)))
-        .get()
-      srcModel.psfUpdate(new GEPush(
-        new GEPushParam(srcModel.id,
-          srcindices, srcdeltas, numNodePerRow, dimension)))
-        .get()
-      endTime = System.currentTimeMillis()
-      logInfo(s"*ghand*worker ${TaskContext.getPartitionId()} pushes ${dstindices.length} vectors " +
-        s"to PS, takes ${(endTime - startTime) / 1000.0} seconds.")
+      logInfo(s"dotTime=$dotTime gradientTime=$gradientTime adjustTime=$adjustTime")
 
       // push back and compute loss
       Iterator.single((loss, srcIds.length))
@@ -245,7 +208,7 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
     val meta: DistributionMeta = sampler.hashDestinationForNodes(sampler.trainset.getNumPartitions)
     val bcMeta = sparkContext.broadcast(meta)
     val geModel: GEModel = initModel(sampler, bcMeta)
-
+    psMatrix = geModel.asInstanceOf[GEDOTModel].psModel
     val batchIter = sampler.batchIterator() // barrierRDD.
     val trainStart = System.currentTimeMillis()
 

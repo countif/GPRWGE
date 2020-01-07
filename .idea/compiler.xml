@@ -9,8 +9,8 @@
         <module name="GPRWGE" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
-      <module name="GPRWGE" target="1.5" />
+    <bytecodeTargetLevel target="8">
+      <module name="GPRWGE" target="8" />
     </bytecodeTargetLevel>
   </component>
 </project>
