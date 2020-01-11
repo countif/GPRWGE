@@ -265,6 +265,7 @@ class GEDOTModel (sampler: BaseSampler, bcMeta: Broadcast[DistributionMeta],
       .dense(numRow, numCol, rowsInBlock, colsInBlock, RowType.T_FLOAT_DENSE,
         Map(AngelConf.ANGEL_PS_PARTITION_SOURCE_CLASS -> classOf[PartitionSourceArray].getName))
     println(s"Model created, takes ${(System.currentTimeMillis() - begin) / 1000.0}s")
+		println("dstModel.id"+psMatrix.id)
     psMatrix
   }
 

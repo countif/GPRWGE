@@ -29,7 +29,7 @@ class GEWORKER(params: Map[String, String]) extends GraphEmbedding(params: Map[S
     val srcModel: PSMatrix = gePSModel.srcModel
     val dstModel: PSMatrix = gePSModel.dstModel
 
-    val (batchLoss, batchCnt) = batchData.mapPartitions((iterator) => {
+    val (batchLoss, batchCnt) = batchData.mapPartitionsWithIndex((Partitionid,iterator) => {
       var (startTime, endTime) = (0L, 0L)
       val pairsDataset = iterator.next()._2
       val srcIds = pairsDataset.src.toArray
@@ -286,6 +286,7 @@ class GEWORKER(params: Map[String, String]) extends GraphEmbedding(params: Map[S
         trainedLoss += batchLoss
         trainedPairs += batchCnt
         batchId += 1
+        logInfo(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs}")
         logInfo(s"*ghand*epochId:${epochId} batchId:${batchId} " +
           s"batchPairs:${batchCnt} loss:${batchLoss / batchCnt}")
 
