@@ -42,6 +42,7 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
     val param = new DotParam(psMatrix.id, batchSeed, partitionId, pairData.src.toArray, pairData.dst.toArray)
     new Dot(param)
   }
+
   protected def psfUpdate(func: UpdateFunc): VoidResult = {
     psMatrix.psfUpdate(func).get()
   }
@@ -73,6 +74,12 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
       }
     }
     loss.toFloat
+  }
+
+  private def randomInitialize(seed: Int): Unit = {
+    val beforeRandomize = System.currentTimeMillis()
+    psfUpdate(new NEModelRandomize(psMatrix.id, dimension / numParts, dimension, 2, seed))
+    logInfo(s"Model successfully Randomized, cost ${(System.currentTimeMillis() - beforeRandomize) / 1000.0}s")
   }
 
   override def train(batchData: RDD[(Int, PairsDataset)], bcMeta: Broadcast[DistributionMeta],
@@ -109,7 +116,7 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
       logInfo(s"dotTime=$dotTime gradientTime=$gradientTime adjustTime=$adjustTime")
 
       // push back and compute loss
-      Iterator.single((loss, srcIds.length))
+      Iterator.single((loss, dots.length))
     },preservesPartitioning = true).reduce((x, y) => (x._1 + y._1, x._2 + y._2))
 
 
@@ -159,7 +166,7 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
 
 
     psMatrix.psfUpdate(getInitFunc(chunkedDataset.getNumPartitions, vertexNum, -1, negative = negative, -1))
-
+    randomInitialize(rand.nextInt)
 
     for (epochId <- 0 until (numEpoch)) {
       var trainedLoss = 0.0

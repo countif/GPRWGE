@@ -233,6 +233,13 @@ class GEDOTModel (sampler: BaseSampler, bcMeta: Broadcast[DistributionMeta],
     val numNode = bcMeta.value.srcMeta.length
 		val partDim = dimension / numParts
     val order = 2
+		val num1 = partDim * order
+		println("dimension="+dimension)
+		println("numParts="+numParts)
+		println("partDim*order="+num1)
+		println("numNode="+numNode)
+		println("numParts="+numParts)
+		println("numNodePerRow="+numNodePerRow)
 		val psModel = createPSMatrix(partDim * order, numNode, numParts, numNodePerRow)
     psModel
   }
