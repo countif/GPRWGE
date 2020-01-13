@@ -8,6 +8,8 @@ object Main{
 	def main(args: Array[String]): Unit = {
 		val params = ArgsUtil.parse(args)
 		val platForm = params.getOrElse(EmbeddingConf.PLATFORM, "PS").toUpperCase()
+		System.err.println(params)
+		System.out.println(params)
 		platForm match{
 
 			case "PS" => new GEPS(params).run()

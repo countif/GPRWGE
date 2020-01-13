@@ -56,13 +56,15 @@ class GEPS(params: Map[String, String]) extends GraphEmbedding(params: Map[Strin
 
 
 			logInfo(s"*ghand*dstIds.length:${dstIds.length}")
+			System.err.println(s"*ghand*dstIds.length:${dstIds.length}")
 			val indices: Array[Int] = indicesSet.toIntArray()
 
 			for(i<- 0 until indices.length)
-				println("indices\t"+indices(i))
+				System.err.println("indices\t"+indices(i))
+
 
 			println("indices length\t"+indices.length)
-
+			System.err.println("indices length\t"+indices.length)
 			startTime = System.currentTimeMillis()
 			// pull them and train
 			val result  = dstModel.psfGet(new GEPull(
@@ -75,7 +77,8 @@ class GEPS(params: Map[String, String]) extends GraphEmbedding(params: Map[Strin
 			endTime = System.currentTimeMillis()
 			logInfo(s"*ghand*worker ${TaskContext.getPartitionId()} pulls ${indices.length} vectors " +
 				s"from PS, takes ${(endTime - startTime) / 1000.0} seconds.")
-
+			System.err.println(s"*ghand*worker ${TaskContext.getPartitionId()} pulls ${indices.length} vectors " +
+				s"from PS, takes ${(endTime - startTime) / 1000.0} seconds.")
 			startTime = System.currentTimeMillis()
 			val index2offset = new Int2IntOpenHashMap() //
 			index2offset.defaultReturnValue(-1)
@@ -108,6 +111,8 @@ class GEPS(params: Map[String, String]) extends GraphEmbedding(params: Map[Strin
 			// TODO: some penalty to frequently updates, i.e., stale updates
 			logInfo(s"*ghand*worker ${TaskContext.getPartitionId()} finished training, " +
 				s"takes ${(endTime - startTime) / 1000.0} seconds.")
+			System.err.println(s"*ghand*worker ${TaskContext.getPartitionId()} finished training, " +
+				s"takes ${(endTime - startTime) / 1000.0} seconds.")
 			startTime = System.currentTimeMillis()
 			dstModel.psfUpdate(new GEPush(
 				new GEPushParam(dstModel.id,
@@ -116,12 +121,13 @@ class GEPS(params: Map[String, String]) extends GraphEmbedding(params: Map[Strin
 			endTime = System.currentTimeMillis()
 			logInfo(s"*ghand*worker ${TaskContext.getPartitionId()} pushes ${indices.length} vectors " +
 				s"to PS, takes ${(endTime - startTime) / 1000.0} seconds.")
-
+			System.err.println(s"*ghand*worker ${TaskContext.getPartitionId()} pushes ${indices.length} vectors " +
+				s"to PS, takes ${(endTime - startTime) / 1000.0} seconds.")
 			// push back and compute loss
 			Iterator.single((loss, srcIds.length))
 		}).reduce((x, y) => (x._1 + y._1, x._2 + y._2))
 
-
+		System.err.println(s"*ghand*batch finished, batchLoss: ${batchLoss / batchCnt}, batchCnt:${batchCnt}")
 		logInfo(s"*ghand*batch finished, batchLoss: ${batchLoss / batchCnt}, batchCnt:${batchCnt}")
 		(batchLoss, batchCnt)
 	}

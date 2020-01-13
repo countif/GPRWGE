@@ -57,19 +57,10 @@ class GEWORKER(params: Map[String, String]) extends GraphEmbedding(params: Map[S
       for(i <- 0 until(dstIds.length)){
         dstindicesSet.add(dstIds(i))
       }
-      logInfo(s"*ghand*srcIds.length:${srcIds.length}")
-      logInfo(s"*ghand*dstIds.length:${dstIds.length}")
+      System.err.println(s"*ghand*srcIds.length:${srcIds.length}")
+      System.err.println(s"*ghand*dstIds.length:${dstIds.length}")
       val srcindices: Array[Int] = srcindicesSet.toIntArray()
       val dstindices: Array[Int] = dstindicesSet.toIntArray()
-
-      for(i<-0 until(srcindices.length))
-        println("srcindices\t"+srcindices(i))
-      println("srcindices length\t"+srcindices.length)
-
-
-      for(i<-0 until(dstindices.length))
-        println("dstindices\t"+dstindices(i))
-      println("dstindices length\t"+dstindices.length)
 
 
       startTime = System.currentTimeMillis()
@@ -91,6 +82,8 @@ class GEWORKER(params: Map[String, String]) extends GraphEmbedding(params: Map[S
       endTime = System.currentTimeMillis()
       logInfo(s"*ghand*worker ${TaskContext.getPartitionId()} pulls ${srcindices.length+dstindices.length} vectors " +
         s"from PS, takes ${(endTime - startTime) / 1000.0} seconds.")
+      System.err.println(s"*ghand*worker ${TaskContext.getPartitionId()} pulls ${srcindices.length+dstindices.length} vectors " +
+        s"from PS, takes ${(endTime - startTime) / 1000.0} seconds.")
 
       startTime = System.currentTimeMillis()
       val srcindex2offset = new Int2IntOpenHashMap()
@@ -105,7 +98,8 @@ class GEWORKER(params: Map[String, String]) extends GraphEmbedding(params: Map[S
 
       println("total number of src\t"+srcindex2offset.size())
       println("total number of dst\t"+dstindex2offset.size())
-
+      System.err.println("total number of src\t"+srcindex2offset.size())
+      System.err.println("total number of dst\t"+dstindex2offset.size())
 
       // deep copy for deltas, we do asgd, for shared Negative sampling, it is not asgd
       val srcdeltas = new Array[Float](srcresult.layers.length)
@@ -119,6 +113,8 @@ class GEWORKER(params: Map[String, String]) extends GraphEmbedding(params: Map[S
 
       println("total length of srcdeltas\t"+srcdeltas.length)
       println("total length of dstdeltas\t"+dstdeltas.length)
+      System.err.println("total length of srcdeltas\t"+srcdeltas.length)
+      System.err.println("total length of dstdeltas\t"+dstdeltas.length)
       // deep copy for src vec
 
       var loss = 0.0f
@@ -148,6 +144,8 @@ class GEWORKER(params: Map[String, String]) extends GraphEmbedding(params: Map[S
       // TODO: some penalty to frequently updates, i.e., stale updates
       logInfo(s"*ghand*worker ${TaskContext.getPartitionId()} finished training, " +
         s"takes ${(endTime - startTime) / 1000.0} seconds.")
+      System.err.println(s"*ghand*worker ${TaskContext.getPartitionId()} finished training, " +
+        s"takes ${(endTime - startTime) / 1000.0} seconds.")
       startTime = System.currentTimeMillis()
       dstModel.psfUpdate(new GEPush(
         new GEPushParam(dstModel.id,
@@ -160,13 +158,14 @@ class GEWORKER(params: Map[String, String]) extends GraphEmbedding(params: Map[S
       endTime = System.currentTimeMillis()
       logInfo(s"*ghand*worker ${TaskContext.getPartitionId()} pushes ${dstindices.length} vectors " +
         s"to PS, takes ${(endTime - startTime) / 1000.0} seconds.")
-
+      System.err.println(s"*ghand*worker ${TaskContext.getPartitionId()} pushes ${dstindices.length} vectors " +
+        s"to PS, takes ${(endTime - startTime) / 1000.0} seconds.")
       // push back and compute loss
       Iterator.single((loss, srcIds.length))
     }).reduce((x, y) => (x._1 + y._1, x._2 + y._2))
 
-
     logInfo(s"*ghand*batch finished, batchLoss: ${batchLoss / batchCnt}, batchCnt:${batchCnt}")
+    System.err.println(s"*ghand*batch finished, batchLoss: ${batchLoss / batchCnt}, batchCnt:${batchCnt}")
     (batchLoss, batchCnt)
   }
 
@@ -236,6 +235,7 @@ class GEWORKER(params: Map[String, String]) extends GraphEmbedding(params: Map[S
 
   override  def run(): Unit = {
     System.out.println("hello this is GEWORKER!!!")
+    System.err.println("hello this is GEWORKER!!!")
     val spark: SparkSession= SparkSession.builder().appName("GraphEmbedding-" + platForm).getOrCreate()
     val sparkContext = spark.sparkContext
 
@@ -289,11 +289,16 @@ class GEWORKER(params: Map[String, String]) extends GraphEmbedding(params: Map[S
         logInfo(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs}")
         logInfo(s"*ghand*epochId:${epochId} batchId:${batchId} " +
           s"batchPairs:${batchCnt} loss:${batchLoss / batchCnt}")
+        System.err.println(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs}")
+        System.err.println(s"*ghand*epochId:${epochId} batchId:${batchId} " +
+          s"batchPairs:${batchCnt} loss:${batchLoss / batchCnt}")
 
       }
 
 
       logInfo(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs} " +
+        s"loss:${trainedLoss / trainedPairs}")
+      System.err.println(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs} " +
         s"loss:${trainedLoss / trainedPairs}")
 
       if (((epochId + 1) % checkpointInterval) == 0) {
@@ -307,6 +312,8 @@ class GEWORKER(params: Map[String, String]) extends GraphEmbedding(params: Map[S
 
 
     logInfo(s"*ghand* training ${numEpoch} epochs takes: " +
+      s"${(System.currentTimeMillis() - trainStart) / 1000.0} seconds")
+    System.err.println(s"*ghand* training ${numEpoch} epochs takes: " +
       s"${(System.currentTimeMillis() - trainStart) / 1000.0} seconds")
     geModel.destory()
   }

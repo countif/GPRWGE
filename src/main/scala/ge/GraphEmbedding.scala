@@ -99,7 +99,9 @@ abstract class GraphEmbedding(val params: Map[String, String]) extends Serializa
 		logInfo(s"*ghand*finished loading data, n" +
 			s"um of chunks:${numChunks}, num of vertex:${vertexNum}, " +
 			s"time cost: ${(System.currentTimeMillis() - start_time) / 1000.0f}")
-
+		System.err.println(s"*ghand*finished loading data, n" +
+			s"um of chunks:${numChunks}, num of vertex:${vertexNum}, " +
+			s"time cost: ${(System.currentTimeMillis() - start_time) / 1000.0f}")
 		start_time = System.currentTimeMillis()
 		val sampler: BaseSampler = samplerName match {
 			case "APP" =>
@@ -134,9 +136,12 @@ abstract class GraphEmbedding(val params: Map[String, String]) extends Serializa
 				batchId += 1
 				logInfo(s"*ghand*epochId:${epochId} batchId:${batchId} " +
 					s"batchPairs:${batchCnt} loss:${batchLoss / batchCnt}")
-
+				System.err.println(s"*ghand*epochId:${epochId} batchId:${batchId} " +
+					s"batchPairs:${batchCnt} loss:${batchLoss / batchCnt}")
 			}
 			logInfo(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs} " +
+				s"loss:${trainedLoss / trainedPairs}")
+			System.err.println(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs} " +
 				s"loss:${trainedLoss / trainedPairs}")
 
 			if (((epochId + 1) % checkpointInterval) == 0) {
@@ -146,6 +151,8 @@ abstract class GraphEmbedding(val params: Map[String, String]) extends Serializa
 			}
 		}
 		logInfo(s"*ghand* training ${numEpoch} epochs takes: " +
+			s"${(System.currentTimeMillis() - trainStart) / 1000.0} seconds")
+		System.err.println(s"*ghand* training ${numEpoch} epochs takes: " +
 			s"${(System.currentTimeMillis() - trainStart) / 1000.0} seconds")
 		geModel.destory()
 	}

@@ -80,6 +80,7 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
     val beforeRandomize = System.currentTimeMillis()
     psfUpdate(new NEModelRandomize(psMatrix.id, dimension / numParts, dimension, 2, seed))
     logInfo(s"Model successfully Randomized, cost ${(System.currentTimeMillis() - beforeRandomize) / 1000.0}s")
+    System.err.println(s"Model successfully Randomized, cost ${(System.currentTimeMillis() - beforeRandomize) / 1000.0}s")
   }
 
   override def train(batchData: RDD[(Int, PairsDataset)], bcMeta: Broadcast[DistributionMeta],
@@ -114,13 +115,16 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
       //       return loss
 
       logInfo(s"dotTime=$dotTime gradientTime=$gradientTime adjustTime=$adjustTime")
+      System.err.println(s"dotTime=$dotTime gradientTime=$gradientTime adjustTime=$adjustTime")
+
 
       // push back and compute loss
-      Iterator.single((loss, dots.length))
+      Iterator.single((loss, srcIds.length))
     },preservesPartitioning = true).reduce((x, y) => (x._1 + y._1, x._2 + y._2))
 
 
     logInfo(s"*ghand*batch finished, batchLoss: ${batchLoss / batchCnt}, batchCnt:${batchCnt}")
+    System.err.println(s"*ghand*batch finished, batchLoss: ${batchLoss / batchCnt}, batchCnt:${batchCnt}")
     (batchLoss, batchCnt)
   }
 
@@ -131,6 +135,8 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
 
   override  def run(): Unit = {
     System.out.println("hello this is GEDOT!!!")
+    System.err.println("hello this is GEDOT!!!")
+
     val spark: SparkSession= SparkSession.builder().appName("GraphEmbedding-" + platForm).getOrCreate()
     val sparkContext = spark.sparkContext
 
@@ -143,7 +149,9 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
     logInfo(s"*ghand*finished loading data, n" +
       s"um of chunks:${numChunks}, num of vertex:${vertexNum}, " +
       s"time cost: ${(System.currentTimeMillis() - start_time) / 1000.0f}")
-
+    System.err.println(s"*ghand*finished loading data, n" +
+      s"um of chunks:${numChunks}, num of vertex:${vertexNum}, " +
+      s"time cost: ${(System.currentTimeMillis() - start_time) / 1000.0f}")
     start_time = System.currentTimeMillis()
     val sampler: BaseSampler = samplerName match {
       case "APP" =>
@@ -181,12 +189,20 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
         trainedLoss += batchLoss
         trainedPairs += batchCnt
         batchId += 1
+
+        System.err.println(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs}")
+
+        System.err.println(s"*ghand*epochId:${epochId} batchId:${batchId} " +
+          s"batchPairs:${batchCnt} loss:${batchLoss / batchCnt}")
+
         logInfo(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs}")
 
         logInfo(s"*ghand*epochId:${epochId} batchId:${batchId} " +
           s"batchPairs:${batchCnt} loss:${batchLoss / batchCnt}")
       }
       logInfo(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs} " +
+        s"loss:${trainedLoss / trainedPairs}")
+      System.err.println(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs} " +
         s"loss:${trainedLoss / trainedPairs}")
 
       if (((epochId + 1) % checkpointInterval) == 0) {
@@ -196,6 +212,8 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
       }
     }
     logInfo(s"*ghand* training ${numEpoch} epochs takes: " +
+      s"${(System.currentTimeMillis() - trainStart) / 1000.0} seconds")
+    System.err.println(s"*ghand* training ${numEpoch} epochs takes: " +
       s"${(System.currentTimeMillis() - trainStart) / 1000.0} seconds")
     geModel.destory()
   }
