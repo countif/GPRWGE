@@ -136,13 +136,11 @@ abstract class GraphEmbedding(val params: Map[String, String]) extends Serializa
 				batchId += 1
 				logInfo(s"*ghand*epochId:${epochId} batchId:${batchId} " +
 					s"batchPairs:${batchCnt} loss:${batchLoss / batchCnt}")
-				System.err.println(s"*ghand*epochId:${epochId} batchId:${batchId} " +
-					s"batchPairs:${batchCnt} loss:${batchLoss / batchCnt}")
 			}
 			logInfo(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs} " +
 				s"loss:${trainedLoss / trainedPairs}")
 			System.err.println(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs} " +
-				s"loss:${trainedLoss / trainedPairs}")
+				s"EpochLoss:${trainedLoss / trainedPairs}")
 
 			if (((epochId + 1) % checkpointInterval) == 0) {
 				// checkpoint the model

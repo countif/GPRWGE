@@ -19,6 +19,10 @@ import com.tencent.angel.spark.ml.psf.embedding.NEDot.NEDotResult
 import com.tencent.angel.spark.ml.psf.embedding.line.{Adjust, AdjustParam, Dot, DotParam}
 
 import scala.util.Random
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.FileSystem
+import org.apache.hadoop.fs.Path
+import java.io.PrintWriter
 
 
 //import ge.DotAdjust.{Adjust, AdjustParam, Dot, DotParam}
@@ -124,7 +128,6 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
 
 
     logInfo(s"*ghand*batch finished, batchLoss: ${batchLoss / batchCnt}, batchCnt:${batchCnt}")
-    System.err.println(s"*ghand*batch finished, batchLoss: ${batchLoss / batchCnt}, batchCnt:${batchCnt}")
     (batchLoss, batchCnt)
   }
 
@@ -137,7 +140,7 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
     System.out.println("hello this is GEDOT!!!")
     System.err.println("hello this is GEDOT!!!")
 
-    val spark: SparkSession= SparkSession.builder().appName("GraphEmbedding-" + platForm).getOrCreate()
+    val spark: SparkSession = SparkSession.builder().appName("GraphEmbedding-" + platForm).getOrCreate()
     val sparkContext = spark.sparkContext
 
     /* loading data */
@@ -173,8 +176,49 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
     val trainStart = System.currentTimeMillis()
 
 
+    sampler.trainset
+
     psMatrix.psfUpdate(getInitFunc(chunkedDataset.getNumPartitions, vertexNum, -1, negative = negative, -1))
     randomInitialize(rand.nextInt)
+
+/*
+    val conf = new Configuration()
+    val fs= FileSystem.get(conf)
+    val output = fs.create(new Path("hdfs://162.105.146.209:9000/user/hadoop/data/graph/wiki-input.txt"))
+    val writer = new PrintWriter(output)
+    writer.write("Hellow World")
+
+
+    for (epochId <- 0 until (1)) {
+      var trainedLoss = 0.0
+      var trainedPairs = 0
+      var batchId = 0
+      while (batchId < numChunks) {
+        val batchData: RDD[PairsDataset] = batchIter.next() // barrierRDD
+        val shuffledData = shuffleDataBySource(batchData, bcMeta)
+        //shuffledData.cache()
+        shuffledData.collect().foreach(
+          x=>{
+            val src = x._2.src
+            val dst = x._2.dst
+            for(i<-0 until(src.length)){
+              val line = src(i).toString +"\t"+ dst(i).toString
+              writer.write(line+"\n")
+            }
+
+          }
+        )
+
+        //shuffledData.unpersist()
+
+        batchId += 1
+
+      }
+
+    }
+    */
+
+
 
     for (epochId <- 0 until (numEpoch)) {
       var trainedLoss = 0.0
@@ -190,11 +234,6 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
         trainedPairs += batchCnt
         batchId += 1
 
-        System.err.println(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs}")
-
-        System.err.println(s"*ghand*epochId:${epochId} batchId:${batchId} " +
-          s"batchPairs:${batchCnt} loss:${batchLoss / batchCnt}")
-
         logInfo(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs}")
 
         logInfo(s"*ghand*epochId:${epochId} batchId:${batchId} " +
@@ -203,7 +242,7 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
       logInfo(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs} " +
         s"loss:${trainedLoss / trainedPairs}")
       System.err.println(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs} " +
-        s"loss:${trainedLoss / trainedPairs}")
+        s"EpochLoss:${trainedLoss / trainedPairs}")
 
       if (((epochId + 1) % checkpointInterval) == 0) {
         // checkpoint the model
@@ -211,11 +250,14 @@ class GEDOT(params: Map[String, String]) extends GraphEmbedding(params: Map[Stri
         geModel.saveDstModel(output + "_dst_" + epochId, bcDict)
       }
     }
+
     logInfo(s"*ghand* training ${numEpoch} epochs takes: " +
       s"${(System.currentTimeMillis() - trainStart) / 1000.0} seconds")
     System.err.println(s"*ghand* training ${numEpoch} epochs takes: " +
       s"${(System.currentTimeMillis() - trainStart) / 1000.0} seconds")
     geModel.destory()
+
+
   }
 
 }

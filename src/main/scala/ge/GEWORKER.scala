@@ -96,10 +96,6 @@ class GEWORKER(params: Map[String, String]) extends GraphEmbedding(params: Map[S
       dstindex2offset.defaultReturnValue(-1)
       for (i <- 0 until dstindices.length) dstindex2offset.put(dstindices(i), i)
 
-      println("total number of src\t"+srcindex2offset.size())
-      println("total number of dst\t"+dstindex2offset.size())
-      System.err.println("total number of src\t"+srcindex2offset.size())
-      System.err.println("total number of dst\t"+dstindex2offset.size())
 
       // deep copy for deltas, we do asgd, for shared Negative sampling, it is not asgd
       val srcdeltas = new Array[Float](srcresult.layers.length)
@@ -111,10 +107,6 @@ class GEWORKER(params: Map[String, String]) extends GraphEmbedding(params: Map[S
         dstdeltas(i) = dstresult.layers(i)
       }
 
-      println("total length of srcdeltas\t"+srcdeltas.length)
-      println("total length of dstdeltas\t"+dstdeltas.length)
-      System.err.println("total length of srcdeltas\t"+srcdeltas.length)
-      System.err.println("total length of dstdeltas\t"+dstdeltas.length)
       // deep copy for src vec
 
       var loss = 0.0f
@@ -164,8 +156,6 @@ class GEWORKER(params: Map[String, String]) extends GraphEmbedding(params: Map[S
       Iterator.single((loss, srcIds.length))
     }).reduce((x, y) => (x._1 + y._1, x._2 + y._2))
 
-    logInfo(s"*ghand*batch finished, batchLoss: ${batchLoss / batchCnt}, batchCnt:${batchCnt}")
-    System.err.println(s"*ghand*batch finished, batchLoss: ${batchLoss / batchCnt}, batchCnt:${batchCnt}")
     (batchLoss, batchCnt)
   }
 
@@ -289,17 +279,13 @@ class GEWORKER(params: Map[String, String]) extends GraphEmbedding(params: Map[S
         logInfo(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs}")
         logInfo(s"*ghand*epochId:${epochId} batchId:${batchId} " +
           s"batchPairs:${batchCnt} loss:${batchLoss / batchCnt}")
-        System.err.println(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs}")
-        System.err.println(s"*ghand*epochId:${epochId} batchId:${batchId} " +
-          s"batchPairs:${batchCnt} loss:${batchLoss / batchCnt}")
-
       }
 
 
       logInfo(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs} " +
         s"loss:${trainedLoss / trainedPairs}")
       System.err.println(s"*ghand*epochId:${epochId} trainedPairs:${trainedPairs} " +
-        s"loss:${trainedLoss / trainedPairs}")
+        s"EpochLoss:${trainedLoss / trainedPairs}")
 
       if (((epochId + 1) % checkpointInterval) == 0) {
         // checkpoint the model

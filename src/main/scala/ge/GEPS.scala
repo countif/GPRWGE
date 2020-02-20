@@ -127,8 +127,6 @@ class GEPS(params: Map[String, String]) extends GraphEmbedding(params: Map[Strin
 			Iterator.single((loss, srcIds.length))
 		}).reduce((x, y) => (x._1 + y._1, x._2 + y._2))
 
-		System.err.println(s"*ghand*batch finished, batchLoss: ${batchLoss / batchCnt}, batchCnt:${batchCnt}")
-		logInfo(s"*ghand*batch finished, batchLoss: ${batchLoss / batchCnt}, batchCnt:${batchCnt}")
 		(batchLoss, batchCnt)
 	}
 
